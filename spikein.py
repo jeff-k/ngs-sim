@@ -84,9 +84,12 @@ class ChemProfile:
     def amplify(self, seq):
         seq = list(seq)
         for i in range(len(seq)):
-            base = seq[i]
-            ps = self.err_mat[['A','C','G','T'].index(base)]
-            seq[i] = np.random.choice(['A','C','G','T'], p=ps)
+
+            # Mutate sequence with the error matrix
+            if self.err_mat is not None:
+                base = seq[i]
+                ps = self.err_mat[['A','C','G','T'].index(base)]
+                seq[i] = np.random.choice(['A','C','G','T'], p=ps)
         return ''.join(seq)
 
 if __name__ == "__main__":
@@ -117,6 +120,10 @@ if __name__ == "__main__":
             vcf, p = m.split(',')
         else:
             vcf = m
+        if not os.path.exists(vcf):
+            print("Variant file {} does not exist!".format(vcf),
+                  file=sys.stderr)
+            exit(1)
         mutations.append((vcf, int(p)))
 
     y = 0
@@ -125,9 +132,15 @@ if __name__ == "__main__":
     total_reads = args.num
     conseq = None
     
+    # Randomize a run id to avoid read name collisions
+    id_space = "01234567890ABCDEF"
+    m_id = ""
+    for _ in range(6):
+        m_id += id_space[np.random.randint(len(id_space))]
+
     fq1 = open(fq1_path, 'w')
     fq2 = open(fq2_path, 'w')
- 
+
     for m, f in mutations:
         y += 1
         ops = []
@@ -145,8 +158,10 @@ if __name__ == "__main__":
 
         for count in range(int(total_reads * proportion)):
             r1, r2 = prof.fragment(prof.amplify(sub_seq))
-            print(write_fastq(r1, "@SYNTH:0:0000000:0:0:{}:{} 1:N:0:0".format(
-                y, count)), file=fq1)
-            print(write_fastq(r2, "@SYNTH:0:0000000:0:0:{}:{} 2:N:0:0".format(
-                y, count)), file=fq2)
+            print(write_fastq(r1,
+                "@SYNTH-{}:0:0000000:0:0:{}:{} 1:N:0:0".format(m_id, y, count)),
+                 file=fq1)
+            print(write_fastq(r2,
+                "@SYNTH-{}:0:0000000:0:0:{}:{} 2:N:0:0".format(m_id, y, count)),
+                file=fq2)
     print(conseq, file=open("conseq.fasta", 'w'))
