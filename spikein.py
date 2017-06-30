@@ -5,6 +5,8 @@ In-silico NGS data synthesis
 
 import itertools
 import argparse
+import os.path
+import sys
 import numpy as np
 
 def write_fastq(seq, rname):
@@ -92,23 +94,40 @@ if __name__ == "__main__":
     parser.add_argument('ref')
     parser.add_argument('-p', default=1)
     parser.add_argument('-n', '--num', default=10000)
-    parser.add_argument('--mutations', '-m', default=[])
-    parser.add_argument('--template', '-t', default=None)
+    parser.add_argument('-m', '--mutations', '-m', nargs='+', 
+                        default=[])
+    parser.add_argument('-t', '--template', '-t', default=None)
+    parser.add_argument('-o', '--out', default="out")
     args = parser.parse_args()
 
     prof = ChemProfile(2000, 151)
     reads = []
-    fq1 = open("fq1.fastq", 'w')
-    fq2 = open("fq2.fastq", 'w')
-   
-    #mutations = parse_mutations(args.mutations)
-    mutations = [("empty.vcf", 1), ("mutations.vcf", 9),]
+
+    fq1_path = "{}_R1.fastq".format(args.out)
+    fq2_path = "{}_R2.fastq".format(args.out)
+    if os.path.exists(fq1_path) or os.path.exists(fq2_path):
+        print("Output path already exists!", file=sys.stderr)
+        exit(1)
+
+ 
+    mutations = []
+    for m in args.mutations:
+        p = 1
+        if ',' in m:
+            vcf, p = m.split(',')
+        else:
+            vcf = m
+        mutations.append((vcf, int(p)))
 
     y = 0
     total_p = sum(map(lambda x: x[1], mutations))
     conseq_p = max(map(lambda x: x[1], mutations))
     total_reads = args.num
     conseq = None
+    
+    fq1 = open(fq1_path, 'w')
+    fq2 = open(fq2_path, 'w')
+ 
     for m, f in mutations:
         y += 1
         ops = []
